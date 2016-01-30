@@ -1,0 +1,133 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Jean-Marc BOUVIER"
+date: "30 janvier 2016"
+output: html_document
+---
+
+After browsing the training and testing files, the first obvious thing to do is to clean them from empty, almost empty and NA columns.
+
+```{r}
+library(AppliedPredictiveModeling)
+library(caret); library(rpart); library(car); library(boot)
+library(e1071)
+
+
+cltrain <- read.csv("C:\\Users\\Nicolas\\Documents\\Perso\\LeanStartUp\\AnalyseDonnees\\CourseraFormation\\DataSpecialization\\MachineLearning\\Data\\cltraining.csv")
+cltest <- read.csv("C:\\Users\\Nicolas\\Documents\\Perso\\LeanStartUp\\AnalyseDonnees\\CourseraFormation\\DataSpecialization\\MachineLearning\\Data\\cltesting.csv")
+```
+We have quite a lot of variables, so it seems appropriate to use multiple decision tree models, so I used Boosting and Random forest.
+
+In order to have an optimum accuracy, I executed each model with several folds of cross validation, mentioned in Train Control parameter.
+
+First of all I applied a boosting method with a cross validation of 5 folds of resampling:
+
+```{r}
+modBoost <-train(classe~., method="gbm", data=cltrain, verbose=FALSE, 
+                 trControl=trainControl(method = "cv",
+                                        number = 5))
+```
+
+This model reaches a quite good accuracy after building 150 trees and 3 levels of splits :
+```{r}
+modBoost
+```
+
+The accuracy of each resample is quite good :
+```{r}
+modBoost$resample
+```
+
+Let's predict this model on the testing set :
+```{r}
+pred_boost = predict(modBoost, cltest, type="prob")
+```
+This gives us the prediction for each value of our outcome "classe" :
+
+             A           B            C            D            E
+1  0.057117473 0.517227468 0.2514529349 0.1451880634 0.0290140600	B
+2  0.945209236 0.038351629 0.0072419468 0.0029380812 0.0062591064	A
+3  0.142769947 0.684099748 0.1038370988 0.0276793891 0.0416138167	B
+4  0.837583357 0.005967526 0.1350548245 0.0183990496 0.0029952424	A
+5  0.952364002 0.028469859 0.0124786946 0.0013710212 0.0053164230	A
+6  0.001135753 0.025565586 0.0553197437 0.0049348927 0.9130440247	E
+7  0.017132739 0.068194575 0.1992885477 0.6703495529 0.0450345861	D
+8  0.040502561 0.648242484 0.0648364349 0.1988133777 0.0476051425	C
+9  0.995041895 0.002542415 0.0009662398 0.0007224106 0.0007270396	A
+10 0.913370295 0.043604048 0.0211994791 0.0142127670 0.0076134115	A
+11 0.033638044 0.806052883 0.1042149990 0.0276598916 0.0284341826	B
+12 0.082451982 0.070839112 0.7343506315 0.0372641230 0.0750941507	C
+13 0.018791626 0.816453665 0.0211461758 0.0216263564 0.1219821766	B
+14 0.982952654 0.004375199 0.0085108467 0.0015672390 0.0025940618	A
+15 0.018676447 0.038358376 0.0203766481 0.0473590478 0.8752294810	E
+16 0.024769497 0.030565449 0.0076828403 0.0258134562 0.9111687573	E
+17 0.878263092 0.012313788 0.0271534193 0.0055652530 0.0767044479	A
+18 0.078659900 0.779424849 0.0068833470 0.0902044964 0.0448274082	B
+19 0.208441191 0.706939534 0.0141238340 0.0590686917 0.0114267492	B
+20 0.005090958 0.966328513 0.0043231801 0.0033169966 0.0209403523	B
+
+This is a first result, but we should try to run a model with an even better accuracy.
+
+So, let's run a Random Forest model on the training set with 3 folds of cross validation :
+```{r}
+modRf <-train(classe~., method="rf", data=cltrain,  trControl=trainControl(method = "cv",
+                                                                            number = 3))
+```
+The accuracy of this model is better than the boosting one :
+```{r}
+modRf$resample 
+```
+
+500 trees were built and the expected out of sample error (out of the box) rate is weak :
+```{r}
+modRf$finalModel 
+```
+
+```{r}
+plot(modRf$finalModel) 
+```
+
+So, let's predict the test values :
+```{r}
+pred_rf = predict(modRf, cltest, type="prob")
+```
+
+The random forest prediction for the testing set is almost the same as the boosting one :
+```{r}
+pred_rf 
+```
+       A     B     C     D     E
+1  0.026 0.850 0.090 0.016 0.018		B
+2  0.986 0.004 0.006 0.002 0.002		A
+3  0.072 0.860 0.038 0.008 0.022		B
+4  0.970 0.002 0.012 0.016 0.000		A
+5  0.976 0.010 0.014 0.000 0.000		A
+6  0.006 0.032 0.038 0.008 0.916		E
+7  0.006 0.000 0.030 0.954 0.010		D
+8  0.032 0.812 0.044 0.072 0.040		B
+9  1.000 0.000 0.000 0.000 0.000		A
+10 0.998 0.000 0.000 0.002 0.000		A
+11 0.014 0.828 0.094 0.026 0.038		B
+12 0.004 0.070 0.816 0.028 0.082		C
+13 0.002 0.996 0.000 0.000 0.002		B
+14 1.000 0.000 0.000 0.000 0.000		A
+15 0.000 0.008 0.004 0.008 0.980		E
+16 0.008 0.014 0.000 0.000 0.978		E
+17 0.976 0.000 0.000 0.000 0.024		A
+18 0.022 0.866 0.002 0.096 0.014		B
+19 0.076 0.902 0.004 0.008 0.010		B
+20 0.000 1.000 0.000 0.000 0.000		B
+
+
+Now, let's combine both models to see if we get a better accuracy :
+```{r}
+comb_data = data.frame(pred_rf,pred_boost, classe = cltest$classe)
+model_comb = train(classe ~ ., method = 'rf', data = comb_data)
+plot(model_comb)
+model_comb
+```
+
+We can see that the Root Mean Square Error is quite good and works better with 6 predictors.
+Anyway, each model run separately gave a good result, due to the high number of resampling trees and to the cross validations executed for each model.
+Expected out of sample error rate was satisfying, especially for Random forest(OOB rate).
+
